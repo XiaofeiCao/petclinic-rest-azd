@@ -52,13 +52,16 @@ function Get-ResponseText {
 $root = Split-Path $PSScriptRoot -Parent
 $parameters = Get-Content -LiteralPath (Join-Path $root 'infra\application.parameters.json') -Raw |
     ConvertFrom-Json -AsHashtable
-if ($parameters.parameters['identityClientId']['value'] -cne '${APPLICATION_IDENTITY_CLIENT_ID}') {
-    throw 'The separate azd service deployment must receive the application identity client ID.'
+if ($parameters.parameters.ContainsKey('identityId') -or $parameters.parameters.ContainsKey('identityClientId')) {
+    throw 'System-assigned identity must not require separate identity parameters.'
 }
 $definition = Get-Content -LiteralPath (Join-Path $root 'infra\application.bicep') -Raw
 $postgres = Get-Content -LiteralPath (Join-Path $root 'src\main\resources\application.properties') -Raw
 if ($definition -match 'SPRING_APPLICATION_JSON|SPRING_SQL_INIT_MODE|SPRING_JPA_HIBERNATE_DDL_AUTO' -or
     $definition -match 'SPRING_DATASOURCE_' -or
+    !$definition.Contains("identity: { type: 'SystemAssigned' }") -or
+    !$definition.Contains("identity: 'system'") -or
+    $definition.Contains('AZURE_CLIENT_ID') -or
     !$definition.Contains("name: 'POSTGRES_URL'") -or
     !$postgres.Contains('spring.datasource.username=petclinic_app') -or
     !$postgres.Contains('AzurePostgresqlAuthenticationPlugin') -or

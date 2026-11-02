@@ -38,7 +38,7 @@ Both are burstable demo configurations, not production tiers. Regional SKU
 availability and subscription quota apply. For automation, set `DATABASE_SIZE`
 with `azd env set` before provisioning; `--no-prompt` uses small unless saved.
 
-Use a **fresh environment** when upgrading from a password-based version.
+Use a **fresh environment** when upgrading from a password-based or user-assigned identity version.
 Reprovisioning does not migrate data or delete retired MySQL, Key Vault, jobs,
 identities, secrets, or permissions.
 
@@ -64,7 +64,7 @@ deleted sample records. The template changes only database connection and identi
 settings; application initialization is preserved.
 `application.properties` configures PostgreSQL managed identity by default.
 The JDBC URL contains only the endpoint; identity and TLS options are separate
-Hikari datasource properties. Bicep supplies only `POSTGRES_URL` and `AZURE_CLIENT_ID`,
+Hikari datasource properties. Bicep supplies only `POSTGRES_URL`,
 with no Spring configuration overrides.
 
 ## Call the API
@@ -85,7 +85,7 @@ curl "https://<app-host>/petclinic/api/vets"
 
 - Ingress is HTTPS-only; the bootstrap image has no public ingress.
 - PostgreSQL password authentication is disabled. The JDBC authentication plugin
-  obtains tokens using the app's user-assigned managed identity.
+  obtains tokens using the app's system-assigned managed identity, also used for ACR pulls.
 - Database connections verify the TLS certificate and hostname.
 - The app owns its tables and has `USAGE, CREATE` on the `public` schema.
   It is not a read/write-only database role.

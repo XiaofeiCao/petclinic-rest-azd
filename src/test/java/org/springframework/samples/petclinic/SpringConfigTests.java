@@ -24,8 +24,7 @@ class SpringConfigTests {
             .withInitializer(new ConfigDataApplicationContextInitializer())
             .withPropertyValues(
                 "spring.config.location=file:./src/main/resources/",
-                "POSTGRES_URL=jdbc:postgresql://test.postgres.database.azure.com:5432/petclinic",
-                "AZURE_CLIENT_ID=test-client-id")
+                "POSTGRES_URL=jdbc:postgresql://test.postgres.database.azure.com:5432/petclinic")
             .run(context -> {
                 HikariDataSource datasource = context.getBean(HikariDataSource.class);
                 assertEquals("jdbc:postgresql://test.postgres.database.azure.com:5432/petclinic",
@@ -36,7 +35,7 @@ class SpringConfigTests {
                 assertEquals("com.azure.identity.extensions.jdbc.postgresql.AzurePostgresqlAuthenticationPlugin",
                     options.getProperty("authenticationPluginClassName"));
                 assertEquals("true", options.getProperty("azure.managedIdentityEnabled"));
-                assertEquals("test-client-id", options.getProperty("azure.clientId"));
+                assertNull(options.getProperty("azure.clientId"));
                 assertEquals("verify-full", options.getProperty("sslmode"));
                 assertEquals("/etc/ssl/certs/ca-certificates.crt", options.getProperty("sslrootcert"));
                 assertEquals("postgres", context.getEnvironment().getProperty("spring.sql.init.platform"));

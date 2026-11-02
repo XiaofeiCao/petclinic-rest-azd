@@ -9,24 +9,6 @@ resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   properties: { adminUserEnabled: false }
 }
 
-resource applicationIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
-  name: 'id-petclinic-${token}'
-  location: location
-}
-
-resource pull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: registry
-  name: guid(registry.id, applicationIdentity.id, 'AcrPull')
-  properties: {
-    principalId: applicationIdentity.properties.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: subscriptionResourceId(
-      'Microsoft.Authorization/roleDefinitions',
-      '7f951dda-4ed3-4680-a7ca-43fe172d538d'
-    )
-  }
-}
-
 resource workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: 'log-petclinic-${token}'
   location: location
@@ -51,7 +33,5 @@ resource environment 'Microsoft.App/managedEnvironments@2024-03-01' = {
 }
 
 output registryEndpoint string = registry.properties.loginServer
+output registryName string = registry.name
 output environmentId string = environment.id
-output applicationIdentityId string = applicationIdentity.id
-output applicationPrincipalId string = applicationIdentity.properties.principalId
-output applicationClientId string = applicationIdentity.properties.clientId

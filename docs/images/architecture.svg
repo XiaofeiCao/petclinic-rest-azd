@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800" role="img" aria-labelledby="title description">
   <title id="title">Spring Petclinic REST on Azure</title>
-  <desc id="description">HTTPS clients reach Spring Petclinic REST in Azure Container Apps. A user-assigned managed identity pulls the image and connects to PostgreSQL over verified TLS as the non-admin petclinic_app role. An administrator maps this identity and grants schema permissions during provisioning. Petclinic creates and seeds its own tables. Logs go to Log Analytics. No database password or Key Vault is used.</desc>
+  <desc id="description">HTTPS clients reach Spring Petclinic REST in Azure Container Apps. Its system-assigned managed identity pulls the image and connects to PostgreSQL over verified TLS as the non-admin petclinic_app role. An administrator maps this identity and grants schema permissions during provisioning. Petclinic creates and seeds its own tables. Logs go to Log Analytics. No database password or Key Vault is used.</desc>
   <rect width="1280" height="800" fill="#f7f9fc"/>
   <text x="40" y="52" font-family="Arial" font-size="30" font-weight="bold" fill="#183153">Spring Petclinic REST on Azure</text>
   <text x="40" y="84" font-family="Arial" font-size="17" fill="#42556e">azd + Bicep | Original application source and startup SQL | Passwordless PostgreSQL</text>

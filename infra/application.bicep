@@ -1,8 +1,6 @@
 param location string
 param serviceName string = 'spring-petclinic-rest-app'
 param environmentId string
-param identityId string
-param identityClientId string
 param registryEndpoint string
 param databaseHost string
 param appImage string
@@ -13,10 +11,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
   name: serviceName
   location: location
   tags: { 'azd-service-name': serviceName }
-  identity: {
-    type: 'UserAssigned'
-    userAssignedIdentities: { '${identityId}': {} }
-  }
+  identity: { type: 'SystemAssigned' }
   properties: {
     managedEnvironmentId: environmentId
     configuration: {
@@ -30,7 +25,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             targetPort: 9966
             transport: 'http'
           }
-      registries: [{ server: registryEndpoint, identity: identityId }]
+      registries: [{ server: registryEndpoint, identity: 'system' }]
     }
     template: {
       containers: [
@@ -40,7 +35,6 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           resources: { cpu: json('0.5'), memory: '1Gi' }
           env: [
             { name: 'POSTGRES_URL', value: 'jdbc:postgresql://${databaseHost}:5432/petclinic' }
-            { name: 'AZURE_CLIENT_ID', value: identityClientId }
           ]
           probes: placeholder
             ? []
