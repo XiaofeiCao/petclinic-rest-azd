@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800" role="img" aria-labelledby="title description">
   <title id="title">Spring Petclinic REST on Azure</title>
-  <desc id="description">HTTPS clients reach Spring Petclinic REST in Azure Container Apps. A user-assigned managed identity pulls the image and connects to PostgreSQL over verified TLS as the non-admin petclinic_app role. An administrator maps this identity and grants schema permissions during provisioning. Petclinic creates and seeds its own tables. Logs go to Log Analytics. No database password or Key Vault is used.</desc>
+  <desc id="description">HTTPS clients reach Spring Petclinic REST in Azure Container Apps. Its system-assigned managed identity pulls the image and connects to PostgreSQL over verified TLS as the non-admin petclinic_app role. An administrator maps this identity and grants schema permissions during provisioning. Petclinic creates and seeds its own tables. Logs go to Log Analytics. No database password or Key Vault is used.</desc>
   <rect width="1280" height="800" fill="#f7f9fc"/>
   <text x="40" y="52" font-family="Arial" font-size="30" font-weight="bold" fill="#183153">Spring Petclinic REST on Azure</text>
   <text x="40" y="84" font-family="Arial" font-size="17" fill="#42556e">azd + Bicep | Original application source and startup SQL | Passwordless PostgreSQL</text>
@@ -26,7 +26,7 @@
   <rect x="260" y="235" width="240" height="115" rx="12" fill="#ffffff" stroke="#2673b8" stroke-width="2"/>
   <text x="380" y="269" text-anchor="middle" font-family="Arial" font-size="19" font-weight="bold" fill="#183153">Petclinic REST</text>
   <text x="380" y="296" text-anchor="middle" font-family="Arial" font-size="16" fill="#42556e">Spring Boot / Java 17</text>
-  <text x="380" y="326" text-anchor="middle" font-family="Arial" font-size="14" fill="#42556e">Identity: application</text>
+  <text x="380" y="326" text-anchor="middle" font-family="Arial" font-size="14" fill="#42556e">Identity: system-assigned</text>
   <text x="560" y="277" font-family="Arial" font-size="18" font-weight="bold" fill="#183153">Application-owned startup</text>
   <text x="560" y="307" font-family="Arial" font-size="16" fill="#42556e">Original schema + seed SQL</text>
   <text x="560" y="337" font-family="Arial" font-size="14" fill="#42556e">App owns its tables; no admin role</text>
@@ -45,7 +45,7 @@
   <text x="670" y="602" text-anchor="middle" font-family="Arial" font-size="19" font-weight="bold" fill="#183153">Log Analytics</text>
   <text x="670" y="632" text-anchor="middle" font-family="Arial" font-size="15" fill="#42556e">Application logs</text>
   <text x="930" y="594" font-family="Arial" font-size="15" fill="#42556e">Database: outbound-IP allowlist</text>
-  <text x="930" y="621" font-family="Arial" font-size="15" fill="#42556e">One application managed identity</text>
+  <text x="930" y="621" font-family="Arial" font-size="15" fill="#42556e">No separate identity resource</text>
   <text x="930" y="648" font-family="Arial" font-size="15" fill="#42556e">No private endpoints / NAT gateway</text>
   <text x="40" y="750" font-family="Arial" font-size="17" font-weight="bold" fill="#183153">Demo baseline, not a production reference architecture.</text>
   <text x="40" y="778" font-family="Arial" font-size="16" fill="#42556e">The API is public and unauthenticated. Do not use sensitive data. Shared egress IPs are not workload isolation.</text>

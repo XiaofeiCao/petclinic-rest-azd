@@ -1,8 +1,9 @@
 # Petclinic REST on Azure
 
 A standalone azd template for the Spring Petclinic REST API (no web UI) on
-Azure Container Apps with PostgreSQL 16. Managed identity authenticates to the
-database and Container Registry; no database password or Key Vault is needed.
+Azure Container Apps with PostgreSQL 16. The app's system-assigned identity authenticates
+to the database and Container Registry; no separate identity resource, database password,
+or Key Vault is needed.
 No azd extension is required.
 
 **Demo only:** the API is public and unauthenticated. The app is a non-admin
@@ -16,6 +17,9 @@ See the [editable diagram](docs/images/architecture.svg) and
 [gallery submission assets](docs/gallery.md).
 
 ## Deploy
+
+For a step-by-step deployment, API, restart, and cleanup demo, see the
+[manual walkthrough](docs/walkthrough.md).
 
 Install [azd](https://aka.ms/azd-install), Azure CLI, Docker, and PowerShell 7.
 Start Docker and sign in to both CLIs with a user account in the target tenant:
@@ -38,7 +42,7 @@ Both are burstable demo configurations, not production tiers. Regional SKU
 availability and subscription quota apply. For automation, set `DATABASE_SIZE`
 with `azd env set` before provisioning; `--no-prompt` uses small unless saved.
 
-Use a **fresh environment** when upgrading from a password-based version.
+Use a **fresh environment** when upgrading from a password-based or user-assigned identity version.
 Reprovisioning does not migrate data or delete retired MySQL, Key Vault, jobs,
 identities, secrets, or permissions.
 
@@ -61,7 +65,11 @@ Docker supplies the PostgreSQL client; no local `psql` installation is needed.
 
 Petclinic runs its original schema and seed SQL at startup. Restarting can restore
 deleted sample records. The template changes only database connection and identity
-settings; local profiles and other application defaults are preserved.
+settings; application initialization is preserved.
+`application.properties` configures PostgreSQL managed identity by default.
+The JDBC URL contains only the endpoint; identity and TLS options are separate
+Hikari datasource properties. Bicep supplies only `POSTGRES_URL`,
+with no Spring configuration overrides.
 
 ## Call the API
 
@@ -77,26 +85,11 @@ Use the app hostname from the HTTPS endpoint printed by azd:
 curl "https://<app-host>/petclinic/api/vets"
 ```
 
-## Run locally
-
-With JDK 17 installed, run from the project root:
-
-```sh
-sh ./mvnw spring-boot:run
-```
-
-On Windows PowerShell, use `.\mvnw.cmd spring-boot:run`.
-The default `h2,spring-data-jpa` profiles use an in-memory database; no Azure
-resources or firewall changes are needed. Data is lost when the process stops.
-Open [Swagger UI](http://localhost:9966/petclinic/swagger-ui.html),
-[the vets API](http://localhost:9966/petclinic/api/vets), or
-[health](http://localhost:9966/petclinic/actuator/health). Stop with Ctrl+C.
-
 ## Security and troubleshooting
 
 - Ingress is HTTPS-only; the bootstrap image has no public ingress.
 - PostgreSQL password authentication is disabled. The JDBC authentication plugin
-  obtains tokens using the app's user-assigned managed identity.
+  obtains tokens using the app's system-assigned managed identity, also used for ACR pulls.
 - Database connections verify the TLS certificate and hostname.
 - The app owns its tables and has `USAGE, CREATE` on the `public` schema.
   It is not a read/write-only database role.
@@ -141,7 +134,8 @@ stubs, then checks non-admin application startup and restart. It uses a local
 password fixture, not Azure authentication; a live Azure deployment is needed
 to verify managed identity end-to-end.
 
-`src/` is unchanged from upstream commit
+Application code is unchanged from upstream commit
 [`afc8fc1`](https://github.com/spring-petclinic/spring-petclinic-rest/tree/afc8fc1d3b8ec8de69414482b3bd70a1da78cb95).
+The application targets PostgreSQL managed identity only. Embedded databases are test-only fixtures.
 `pom.xml` adds `azure-identity-extensions` for passwordless JDBC authentication.
 See [UPSTREAM.md](UPSTREAM.md), [NOTICE](NOTICE), and [LICENSE.txt](LICENSE.txt).

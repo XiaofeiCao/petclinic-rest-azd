@@ -1,7 +1,6 @@
 param location string
 param serviceName string
 param environmentId string
-param identityId string
 
 // Discover the environment's outbound IPs without resetting an existing application.
 @onlyIfNotExists()
@@ -9,10 +8,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
   name: serviceName
   location: location
   tags: { 'azd-service-name': serviceName }
-  identity: {
-    type: 'UserAssigned'
-    userAssignedIdentities: { '${identityId}': {} }
-  }
+  identity: { type: 'SystemAssigned' }
   properties: {
     managedEnvironmentId: environmentId
     configuration: { activeRevisionsMode: 'Single' }
@@ -31,3 +27,4 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
 
 output outboundIps array = app.properties.outboundIpAddresses
 output image string = app.properties.template.containers[0].image
+output principalId string = app.identity.principalId
