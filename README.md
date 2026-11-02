@@ -61,7 +61,11 @@ Docker supplies the PostgreSQL client; no local `psql` installation is needed.
 
 Petclinic runs its original schema and seed SQL at startup. Restarting can restore
 deleted sample records. The template changes only database connection and identity
-settings; local profiles and other application defaults are preserved.
+settings; application initialization is preserved.
+`application.properties` configures PostgreSQL managed identity by default.
+The JDBC URL contains only the endpoint; identity and TLS options are separate
+Hikari datasource properties. Bicep supplies only `POSTGRES_URL` and `AZURE_CLIENT_ID`,
+with no Spring configuration overrides.
 
 ## Call the API
 
@@ -76,21 +80,6 @@ Use the app hostname from the HTTPS endpoint printed by azd:
 ```sh
 curl "https://<app-host>/petclinic/api/vets"
 ```
-
-## Run locally
-
-With JDK 17 installed, run from the project root:
-
-```sh
-sh ./mvnw spring-boot:run
-```
-
-On Windows PowerShell, use `.\mvnw.cmd spring-boot:run`.
-The default `h2,spring-data-jpa` profiles use an in-memory database; no Azure
-resources or firewall changes are needed. Data is lost when the process stops.
-Open [Swagger UI](http://localhost:9966/petclinic/swagger-ui.html),
-[the vets API](http://localhost:9966/petclinic/api/vets), or
-[health](http://localhost:9966/petclinic/actuator/health). Stop with Ctrl+C.
 
 ## Security and troubleshooting
 
@@ -141,7 +130,8 @@ stubs, then checks non-admin application startup and restart. It uses a local
 password fixture, not Azure authentication; a live Azure deployment is needed
 to verify managed identity end-to-end.
 
-`src/` is unchanged from upstream commit
+Application code is unchanged from upstream commit
 [`afc8fc1`](https://github.com/spring-petclinic/spring-petclinic-rest/tree/afc8fc1d3b8ec8de69414482b3bd70a1da78cb95).
+The application targets PostgreSQL managed identity only. Embedded databases are test-only fixtures.
 `pom.xml` adds `azure-identity-extensions` for passwordless JDBC authentication.
 See [UPSTREAM.md](UPSTREAM.md), [NOTICE](NOTICE), and [LICENSE.txt](LICENSE.txt).

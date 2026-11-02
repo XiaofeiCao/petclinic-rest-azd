@@ -8,10 +8,6 @@ param databaseHost string
 param appImage string
 
 var placeholder = appImage == 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
-var authenticationPlugin = 'com.azure.identity.extensions.jdbc.postgresql.AzurePostgresqlAuthenticationPlugin'
-var tlsOptions = 'sslmode=verify-full&sslrootcert=/etc/ssl/certs/ca-certificates.crt'
-var identityOptions = 'authenticationPluginClassName=${authenticationPlugin}&azure.managedIdentityEnabled=true&azure.clientId=${identityClientId}'
-var jdbcUrl = 'jdbc:postgresql://${databaseHost}:5432/petclinic?${tlsOptions}&${identityOptions}'
 
 resource app 'Microsoft.App/containerApps@2024-03-01' = {
   name: serviceName
@@ -43,13 +39,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           image: appImage
           resources: { cpu: json('0.5'), memory: '1Gi' }
           env: [
-            { name: 'SPRING_PROFILES_ACTIVE', value: 'postgres,spring-data-jpa' }
-            {
-              name: 'SPRING_DATASOURCE_URL'
-              value: jdbcUrl
-            }
-            { name: 'SPRING_DATASOURCE_USERNAME', value: 'petclinic_app' }
-            { name: 'SPRING_DATASOURCE_PASSWORD', value: '' }
+            { name: 'POSTGRES_URL', value: 'jdbc:postgresql://${databaseHost}:5432/petclinic' }
             { name: 'AZURE_CLIENT_ID', value: identityClientId }
           ]
           probes: placeholder
