@@ -1,31 +1,35 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
 name: petclinic-rest
-metadata:
-  template: petclinic-rest-azd@0.1.0
+
+requiredVersions:
+  azd: ">=1.37.2"
+  extensions:
+    azure.springboot: ">=0.1.0"
+
 infra:
   provider: bicep
   path: infra
   module: main
+
 services:
   spring-petclinic-rest-app:
     project: .
-    host: containerapp
-    language: docker
+    language: java
+    host: springbootapp
     module: application
+    # Existing Dockerfile: build the application inside Docker.
+    # Alternatively, projects without an authored Dockerfile can omit this block
+    # to use local Maven and an extension-generated runtime Dockerfile.
     docker:
       path: Dockerfile
       context: .
       platform: linux/amd64
-hooks:
-  preup:
-    shell: pwsh
-    run: scripts/Prepare-Database.ps1
-    interactive: false
-  preprovision:
-    shell: pwsh
-    run: scripts/Prepare-Database.ps1
-    interactive: false
-  postprovision:
-    shell: pwsh
-    run: scripts/Configure-Database.ps1
-    interactive: false
+    database:
+      type: postgresql
+      serverResourceId: ${DATABASE_SERVER_ID}
+      databaseName: petclinic
+      auth:
+        type: managedidentity
+        username: petclinic_app
+        appIdentity:
+          type: userAssigned
+          resourceId: ${APPLICATION_IDENTITY_ID}
