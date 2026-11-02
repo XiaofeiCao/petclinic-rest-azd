@@ -1,8 +1,9 @@
 # Petclinic REST on Azure
 
 A standalone azd template for the Spring Petclinic REST API (no web UI) on
-Azure Container Apps with PostgreSQL 16. Managed identity authenticates to the
-database and Container Registry; no database password or Key Vault is needed.
+Azure Container Apps with PostgreSQL 16. The app's system-assigned identity authenticates
+to the database and Container Registry; no separate identity resource, database password,
+or Key Vault is needed.
 No azd extension is required.
 
 **Demo only:** the API is public and unauthenticated. The app is a non-admin
@@ -16,6 +17,9 @@ See the [editable diagram](docs/images/architecture.svg) and
 [gallery submission assets](docs/gallery.md).
 
 ## Deploy
+
+For a step-by-step deployment, API, restart, and cleanup demo, see the
+[manual walkthrough](docs/walkthrough.md).
 
 Install [azd](https://aka.ms/azd-install), Azure CLI, Docker, and PowerShell 7.
 Start Docker and sign in to both CLIs with a user account in the target tenant:
