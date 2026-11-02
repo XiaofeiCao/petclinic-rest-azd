@@ -16,20 +16,3 @@ services:
     language: java
     host: springbootapp
     module: application
-    # Existing Dockerfile: build the application inside Docker.
-    # Alternatively, projects without an authored Dockerfile can omit this block
-    # to use local Maven and an extension-generated runtime Dockerfile.
-    docker:
-      path: Dockerfile
-      context: .
-      platform: linux/amd64
-    database:
-      type: postgresql
-      serverResourceId: ${DATABASE_SERVER_ID}
-      databaseName: petclinic
-      auth:
-        type: managedidentity
-        username: petclinic_app
-        appIdentity:
-          type: userAssigned
-          resourceId: ${APPLICATION_IDENTITY_ID}
