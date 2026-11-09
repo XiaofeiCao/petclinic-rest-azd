@@ -49,7 +49,6 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
               value: jdbcUrl
             }
             { name: 'SPRING_DATASOURCE_USERNAME', value: 'petclinic_app' }
-            { name: 'SPRING_DATASOURCE_PASSWORD', value: '' }
             { name: 'AZURE_CLIENT_ID', value: identityClientId }
           ]
           probes: placeholder
