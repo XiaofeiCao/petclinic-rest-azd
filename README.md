@@ -3,7 +3,8 @@
 A standalone azd template for the Spring Petclinic REST API (no web UI) on
 Azure Container Apps with PostgreSQL 16. Managed identity authenticates to the
 database and Container Registry; no database password or Key Vault is needed.
-No azd extension is required.
+The `azure.springboot` extension required by `azure.yaml` packages the application,
+deploys the service module, and reconciles PostgreSQL access.
 
 **Demo only:** the API is public and unauthenticated. The app is a non-admin
 database user, but can create and manage its own tables. Do not use sensitive data.
@@ -49,19 +50,17 @@ administrator before `azd up` resolves infrastructure parameters and before
 standalone `azd provision`. Service-principal-only provisioning is not supported.
 The lookup uses the existing ARM credential; no Microsoft Graph access is required.
 
-After provisioning, the hook reconciles database firewall rules and uses your
-short-lived Azure CLI token to map the app identity to `petclinic_app`. It grants
-connection and schema creation permissions, not database administration.
-Bicep also creates a temporary `bootstrap-local-ip` rule allowing full IPv4 access:
-HTTPS and database traffic can leave your network through different public IPs.
-The hook removes this rule in `finally`, including when firewall reconciliation,
-authentication, or SQL fails; permanent ACA outbound-IP rules remain.
-Connection checks retry while firewall changes propagate; bootstrap SQL runs once.
-Docker supplies the PostgreSQL client; no local `psql` installation is needed.
+After provisioning, the extension verifies the exact Container Apps outbound-IP
+firewall rules and maps the application identity to `petclinic_app`. SQL
+reconciliation runs from a short-lived Container Apps job in the deployed
+environment. The job receives temporary administrator access only for the bounded
+execution window, then the extension removes that access before deleting the job.
+No unrestricted PostgreSQL firewall rule is created.
 
 Petclinic runs its original schema and seed SQL at startup. Restarting can restore
-deleted sample records. The template changes only database connection and identity
-settings; local profiles and other application defaults are preserved.
+deleted sample records. Azure activates the passwordless `azure-postgres` profile;
+the existing password-based `postgres` profile remains available for explicit local
+development.
 
 ## Call the API
 
@@ -107,11 +106,9 @@ Open [Swagger UI](http://localhost:9966/petclinic/swagger-ui.html),
   IPs are not workload isolation; database authentication remains required.
 - Do not commit `.azure/` or publish its contents.
 
-If identity bootstrap fails, check Azure CLI tenant/sign-in and TCP 5432
-connectivity. Rerun `azd provision` after correcting the cause; Bicep recreates
-temporary bootstrap access. If provisioning fails before the hook, cleanup fails,
-or the hook is forcibly interrupted, remove `bootstrap-local-ip` from the selected
-server manually. It must not remain as deployed application access.
+If identity bootstrap fails, check the signed-in tenant and the redacted Container
+Apps job diagnostic printed by the extension. Rerun `azd provision` after
+correcting the cause. Do not add an unrestricted PostgreSQL firewall rule.
 
 ## Clean up
 
@@ -141,7 +138,8 @@ stubs, then checks non-admin application startup and restart. It uses a local
 password fixture, not Azure authentication; a live Azure deployment is needed
 to verify managed identity end-to-end.
 
-`src/` is unchanged from upstream commit
+`src/main/java/` is unchanged from upstream commit
 [`afc8fc1`](https://github.com/spring-petclinic/spring-petclinic-rest/tree/afc8fc1d3b8ec8de69414482b3bd70a1da78cb95).
-`pom.xml` adds `azure-identity-extensions` for passwordless JDBC authentication.
+The template adds `application-azure-postgres.properties` for the passwordless
+Azure profile, and `pom.xml` adds `azure-identity-extensions` for passwordless JDBC authentication.
 See [UPSTREAM.md](UPSTREAM.md), [NOTICE](NOTICE), and [LICENSE.txt](LICENSE.txt).

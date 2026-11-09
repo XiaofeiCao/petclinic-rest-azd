@@ -23,11 +23,9 @@ jobs:
         run: |
           az bicep build --file infra/main.bicep --outfile /tmp/petclinic-main.json
           az bicep build --file infra/application.bicep --outfile /tmp/petclinic-application.json
-      - name: Validate database hooks
+      - name: Validate managed identity template
         shell: pwsh
-        run: |
-          ./tests/Test-DatabaseFirewall.ps1
-          ./tests/Test-DatabaseIdentity.ps1
+        run: ./tests/Test-ManagedIdentityProfile.ps1
       - name: Build container
         run: docker build --tag petclinic-rest:test .
       - name: Validate database and packaged application

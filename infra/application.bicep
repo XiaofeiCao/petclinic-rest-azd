@@ -43,7 +43,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           image: appImage
           resources: { cpu: json('0.5'), memory: '1Gi' }
           env: [
-            { name: 'SPRING_PROFILES_ACTIVE', value: 'postgres,spring-data-jpa' }
+            { name: 'SPRING_PROFILES_ACTIVE', value: 'azure-postgres,spring-data-jpa' }
             {
               name: 'SPRING_DATASOURCE_URL'
               value: jdbcUrl

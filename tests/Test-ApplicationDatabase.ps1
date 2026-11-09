@@ -100,46 +100,16 @@ try {
     if ((Invoke-DatabaseQuery $tableCountQuery) -ne '0') {
         throw 'The local application database must be empty before application startup.'
     }
-    # Stock PostgreSQL has no Entra extension. Stub only its mapping functions, then run the production SQL.
-    $fixture = @'
-CREATE ROLE azure_pg_admin;
-CREATE TABLE test_entra_mapping (rolname name, objectid uuid, isadmin integer);
-CREATE FUNCTION pg_catalog.pgaadauth_list_principals(boolean)
-RETURNS TABLE (rolname name, objectid uuid, isadmin integer)
-LANGUAGE sql AS 'SELECT * FROM public.test_entra_mapping';
-CREATE FUNCTION pg_catalog.pgaadauth_create_principal_with_oid(text, text, text, boolean, boolean)
-RETURNS text LANGUAGE plpgsql AS $$
-BEGIN
-    EXECUTE format('CREATE ROLE %I LOGIN', $1);
-    INSERT INTO public.test_entra_mapping VALUES ($1, $2::uuid, 0);
-    RETURN $1;
-END $$;
-'@
-    $fixture | & docker exec --interactive $database psql -X -U bootstrapadmin -d postgres -v ON_ERROR_STOP=1 |
-        Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'Could not install local Entra mapping fixtures.' }
-    $sql = Get-Content -LiteralPath (Join-Path $root 'scripts\database-identity.sql') -Raw
-    $principal = [Guid]::NewGuid().ToString()
-    foreach ($attempt in 1..2) {
-        $sql | & docker exec --interactive $database psql -X -U bootstrapadmin -d postgres `
-            -v ON_ERROR_STOP=1 -v "application_oid=$principal" | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw 'Identity bootstrap SQL must be repeatable.' }
-    }
-    $sql | & docker exec --interactive $database psql -X -U bootstrapadmin -d postgres `
-        -v ON_ERROR_STOP=1 -v "application_oid=$([Guid]::NewGuid())" *> $null
-    if ($LASTEXITCODE -eq 0) { throw 'Bootstrap must reject an identity mapping mismatch.' }
-    Invoke-DatabaseQuery 'ALTER ROLE petclinic_app CREATEDB' | Out-Null
-    $sql | & docker exec --interactive $database psql -X -U bootstrapadmin -d postgres `
-        -v ON_ERROR_STOP=1 -v "application_oid=$principal" *> $null
-    if ($LASTEXITCODE -eq 0) { throw 'Bootstrap must reject an existing administrator-capable app role.' }
-    Invoke-DatabaseQuery 'ALTER ROLE petclinic_app NOCREATEDB' | Out-Null
+    Invoke-DatabaseQuery (
+        "CREATE ROLE petclinic_app LOGIN PASSWORD '$password'; " +
+        'GRANT CONNECT ON DATABASE petclinic TO petclinic_app; ' +
+        'REVOKE CREATE ON SCHEMA public FROM PUBLIC; ' +
+        'GRANT USAGE, CREATE ON SCHEMA public TO petclinic_app;'
+    ) | Out-Null
     $roleFlags = Invoke-DatabaseQuery "SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls FROM pg_roles WHERE rolname='petclinic_app'"
     if ($roleFlags -ne 'f' -or (Invoke-DatabaseQuery $tableCountQuery) -ne '0') {
-        throw 'Bootstrap must create a non-admin login without initializing application tables.'
+        throw 'The local fixture must create a non-admin login without initializing application tables.'
     }
-    "ALTER ROLE petclinic_app PASSWORD '$password';" |
-        & docker exec --interactive $database psql -X -U bootstrapadmin -d postgres -v ON_ERROR_STOP=1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'Could not configure the local-only authentication fixture.' }
     $jdbcUrl = 'jdbc:postgresql://database:5432/petclinic?sslmode=disable'
     $application = Invoke-Docker @('run', '--detach', '--network', $network,
         '--publish', '127.0.0.1::9966', '--env', 'SPRING_PROFILES_ACTIVE=postgres,spring-data-jpa',
@@ -175,7 +145,7 @@ END $$;
     }
     $ownerCount = Invoke-DatabaseQuery "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner='petclinic_app'"
     if ($ownerCount -ne '9') { throw 'The non-admin app must own the tables it created.' }
-    Write-Host 'PostgreSQL: non-admin bootstrap and application-owned initialization/restart passed (local auth fixture, not Entra).'
+    Write-Host 'PostgreSQL: non-admin local profile and application-owned initialization/restart passed.'
 } catch {
     foreach ($container in @($application, $database)) {
         if ($container) {
