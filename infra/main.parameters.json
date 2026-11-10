@@ -5,8 +5,12 @@
     "environmentName": { "value": "${AZURE_ENV_NAME}" },
     "location": { "value": "${AZURE_LOCATION}" },
     "useVirtualNetwork": { "value": "${AZURE_USE_VNET=false}" },
-    "databaseAdministratorObjectId": { "value": "${DATABASE_ADMIN_OBJECT_ID}" },
-    "databaseAdministratorName": { "value": "${DATABASE_ADMIN_NAME}" },
+    "databaseAdministratorObjectId": {
+      "value": "${DATABASE_ADMIN_OBJECT_ID=00000000-0000-0000-0000-000000000000}"
+    },
+    "databaseAdministratorName": {
+      "value": "${DATABASE_ADMIN_NAME=azd-preprovision-pending}"
+    },
     "databaseSize": { "value": "${DATABASE_SIZE}" }
   }
 }
