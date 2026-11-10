@@ -35,7 +35,15 @@ module bootstrap 'bootstrap.bicep' = {
     location: location
     serviceName: serviceName
     environmentId: hosting.outputs.environmentId
-    identityId: hosting.outputs.applicationIdentityId
+  }
+}
+
+module registryAccess 'registry-access.bicep' = {
+  name: 'registry-access'
+  scope: group
+  params: {
+    registryName: hosting.outputs.registryName
+    principalId: bootstrap.outputs.principalId
   }
 }
 
@@ -54,12 +62,11 @@ module database 'database.bicep' = {
 module application 'application.bicep' = {
   name: 'application'
   scope: group
+  dependsOn: [registryAccess]
   params: {
     location: location
     serviceName: serviceName
     environmentId: hosting.outputs.environmentId
-    identityId: hosting.outputs.applicationIdentityId
-    identityClientId: hosting.outputs.applicationClientId
     registryEndpoint: hosting.outputs.registryEndpoint
     databaseHost: database.outputs.host
     appImage: bootstrap.outputs.image
@@ -69,9 +76,7 @@ module application 'application.bicep' = {
 output AZURE_RESOURCE_GROUP string = group.name
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = hosting.outputs.registryEndpoint
 output CONTAINER_APP_ENVIRONMENT_ID string = hosting.outputs.environmentId
-output APPLICATION_IDENTITY_ID string = hosting.outputs.applicationIdentityId
-output APPLICATION_IDENTITY_CLIENT_ID string = hosting.outputs.applicationClientId
-output APPLICATION_PRINCIPAL_ID string = hosting.outputs.applicationPrincipalId
+output APPLICATION_PRINCIPAL_ID string = application.outputs.principalId
 output DATABASE_HOST string = database.outputs.host
 output DATABASE_SERVER_ID string = database.outputs.serverId
 output DATABASE_OUTBOUND_IPS string = string(bootstrap.outputs.outboundIps)

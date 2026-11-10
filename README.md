@@ -18,13 +18,20 @@ See the [editable diagram](docs/images/architecture.svg) and
 
 ## Deploy
 
-Install [azd](https://aka.ms/azd-install), Azure CLI, Docker, and PowerShell 7.
+This branch requires a development build of the `azure.springboot` extension
+with extension-owned PostgreSQL job bootstrap support; installing azd alone
+does not provide that unreleased capability. See the
+[extension development instructions](https://github.com/Azure/azure-dev/tree/main/cli/azd/extensions/azure.springboot)
+and install the corresponding development build before deployment.
+The deployment also needs its release-configured bootstrap runner image.
+
+Install [azd](https://aka.ms/azd-install) 1.37.2 or newer, Azure CLI, Docker, and PowerShell 7.
 Start Docker and sign in to both CLIs with a user account in the target tenant:
 
 ```sh
 az login
 azd auth login
-azd init -t weidongxu-microsoft/petclinic-rest-azd
+azd init -t https://github.com/XiaofeiCao/petclinic-rest-azd/tree/postgres-job-bootstrap
 azd up
 ```
 
@@ -39,7 +46,8 @@ Both are burstable demo configurations, not production tiers. Regional SKU
 availability and subscription quota apply. For automation, set `DATABASE_SIZE`
 with `azd env set` before provisioning; `--no-prompt` uses small unless saved.
 
-Use a **fresh environment** when upgrading from a password-based version.
+Use a **fresh environment** when upgrading from a password-based or
+user-assigned-identity version.
 Reprovisioning does not migrate data or delete retired MySQL, Key Vault, jobs,
 identities, secrets, or permissions.
 
@@ -50,11 +58,20 @@ administrator before `azd up` resolves infrastructure parameters and before
 standalone `azd provision`. Service-principal-only provisioning is not supported.
 The lookup uses the existing ARM credential; no Microsoft Graph access is required.
 
+Provisioning first creates the Container App with a public placeholder and its
+system-assigned identity, grants that principal `AcrPull` on the registry, and
+configures registry authentication as `system`. The service deployment keeps the
+same identity when switching to the private application image. Reprovisioning
+preserves the running image and identity.
+
 After provisioning, the extension verifies the exact Container Apps outbound-IP
 firewall rules and maps the application identity to `petclinic_app`. SQL
 reconciliation runs from a short-lived Container Apps job in the deployed
 environment. The job receives temporary administrator access only for the bounded
 execution window, then the extension removes that access before deleting the job.
+The job has its own system-assigned identity, distinct from the application's.
+Its temporary PostgreSQL Entra administrator registration authorizes that same
+job principal; it is not another identity or an Azure RBAC role assignment.
 No unrestricted PostgreSQL firewall rule is created.
 
 Petclinic runs its original schema and seed SQL at startup. Restarting can restore
@@ -95,14 +112,15 @@ Open [Swagger UI](http://localhost:9966/petclinic/swagger-ui.html),
 
 - Ingress is HTTPS-only; the bootstrap image has no public ingress.
 - PostgreSQL password authentication is disabled. The JDBC authentication plugin
-  obtains tokens using the app's user-assigned managed identity.
+  obtains tokens using the app's system-assigned managed identity, without an
+  `azure.clientId` or `AZURE_CLIENT_ID` selector.
 - Database connections verify the TLS certificate and hostname.
 - The app owns its tables and has `USAGE, CREATE` on the `public` schema.
   It is not a read/write-only database role.
 - Firewall rules named `aca-<IPv4-address-with-hyphens>` are template-owned.
   Reprovisioning removes obsolete rules and preserves unrelated rules, which can
   grant additional access. Reprovision if app outbound IPs change.
-- No private endpoints or fixed-egress NAT gateway are configured. Shared egress
+- No customer-managed VNet, private endpoints, or fixed-egress NAT gateway are configured. Shared egress
   IPs are not workload isolation; database authentication remains required.
 - Do not commit `.azure/` or publish its contents.
 
@@ -127,16 +145,15 @@ With JDK 17 and the deployment prerequisites installed:
 sh ./mvnw --batch-mode --no-transfer-progress verify
 az bicep build --file infra/main.bicep
 az bicep build --file infra/application.bicep
-pwsh -File tests/Test-DatabaseFirewall.ps1
-pwsh -File tests/Test-DatabaseIdentity.ps1
+pwsh -File tests/Test-ManagedIdentityProfile.ps1
 docker build --tag petclinic-rest:test .
 pwsh -File tests/Test-ApplicationDatabase.ps1 -ApplicationImage petclinic-rest:test
 ```
 
-The database test runs production bootstrap SQL against local Entra-function
-stubs, then checks non-admin application startup and restart. It uses a local
-password fixture, not Azure authentication; a live Azure deployment is needed
-to verify managed identity end-to-end.
+The database test checks non-admin application startup and restart with a local
+password fixture, not Azure authentication. The managed-identity profile test
+checks template wiring and profile separation; a live Azure deployment is needed
+to verify managed identity and extension-owned SQL bootstrap end-to-end.
 
 `src/main/java/` is unchanged from upstream commit
 [`afc8fc1`](https://github.com/spring-petclinic/spring-petclinic-rest/tree/afc8fc1d3b8ec8de69414482b3bd70a1da78cb95).

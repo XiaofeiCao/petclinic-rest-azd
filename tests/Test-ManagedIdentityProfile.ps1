@@ -6,6 +6,10 @@ $azureYaml = Get-Content -LiteralPath (Join-Path $root 'azure.yaml') -Raw
 $mainBicep = Get-Content -LiteralPath (Join-Path $root 'infra\main.bicep') -Raw
 $databaseBicep = Get-Content -LiteralPath (Join-Path $root 'infra\database.bicep') -Raw
 $applicationBicep = Get-Content -LiteralPath (Join-Path $root 'infra\application.bicep') -Raw
+$bootstrapBicep = Get-Content -LiteralPath (Join-Path $root 'infra\bootstrap.bicep') -Raw
+$hostingBicep = Get-Content -LiteralPath (Join-Path $root 'infra\hosting.bicep') -Raw
+$registryAccess = Get-Content -LiteralPath (Join-Path $root 'infra\registry-access.bicep') -Raw
+$applicationParameters = Get-Content -LiteralPath (Join-Path $root 'infra\application.parameters.json') -Raw
 $azureProfile = Get-Content -LiteralPath (
     Join-Path $root 'src\main\resources\application-azure-postgres.properties') -Raw
 $localProfile = Get-Content -LiteralPath (
@@ -30,8 +34,6 @@ foreach ($obsolete in @(
     }
 }
 foreach ($output in @(
-    'APPLICATION_IDENTITY_ID',
-    'APPLICATION_IDENTITY_CLIENT_ID',
     'APPLICATION_PRINCIPAL_ID',
     'DATABASE_HOST',
     'DATABASE_SERVER_ID',
@@ -39,6 +41,35 @@ foreach ($output in @(
 )) {
     if ($mainBicep -notmatch "(?m)^output $output string =") {
         throw "The extension requires the Bicep output $output."
+    }
+    foreach ($definition in @($bootstrapBicep, $applicationBicep)) {
+        if ($definition -notmatch "type:\s*'SystemAssigned'" -or
+            $definition -notmatch 'output principalId string = app\.identity\.principalId') {
+            throw 'Both application stages must preserve and expose the application system-assigned principal.'
+        }
+    }
+    foreach ($obsolete in @(
+        'UserAssigned', 'userAssignedIdentities', 'identityClientId', 'identityId',
+        'azure.clientId', 'AZURE_CLIENT_ID', 'APPLICATION_IDENTITY_ID', 'APPLICATION_IDENTITY_CLIENT_ID'
+    )) {
+        if (($mainBicep + $hostingBicep + $bootstrapBicep + $applicationBicep + $applicationParameters).
+            Contains($obsolete, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "The system-assigned template must not retain $obsolete."
+        }
+    }
+    if ($bootstrapBicep -notmatch '@onlyIfNotExists\(\)' -or
+        $bootstrapBicep -match '\bregistries\s*:' -or
+        $mainBicep -notmatch 'principalId:\s*bootstrap\.outputs\.principalId' -or
+        $mainBicep -notmatch 'dependsOn:\s*\[registryAccess\]' -or
+        $mainBicep -notmatch 'output APPLICATION_PRINCIPAL_ID string = application\.outputs\.principalId' -or
+        $registryAccess -notmatch "guid\(registry\.id, principalId, 'AcrPull'\)" -or
+        $registryAccess -notmatch "principalType:\s*'ServicePrincipal'" -or
+        $registryAccess -notmatch '7f951dda-4ed3-4680-a7ca-43fe172d538d' -or
+        $applicationBicep -notmatch "identity:\s*'system'") {
+        throw 'Create the placeholder SAI, grant registry-scoped AcrPull, then configure the private image with system identity.'
+    }
+    if (($hostingBicep + $mainBicep) -match 'virtualNetworks|infrastructureSubnetId|privateEndpoints|natGateways') {
+        throw 'The published baseline must not introduce a customer-managed network overlay.'
     }
 }
 if ($mainBicep.Contains('bootstrap-local-ip', [StringComparison]::OrdinalIgnoreCase) -or
@@ -88,4 +119,4 @@ foreach ($obsoletePath in @(
     }
 }
 
-Write-Host 'The extension-owned managed-identity contract and local PostgreSQL profile remain separate.'
+Write-Host 'System identity, staged registry access, no-network-overlay baseline, and separate local PostgreSQL profile passed.'

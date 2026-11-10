@@ -1,8 +1,6 @@
 param location string
 param serviceName string = 'spring-petclinic-rest-app'
 param environmentId string
-param identityId string
-param identityClientId string
 param registryEndpoint string
 param databaseHost string
 param appImage string
@@ -10,7 +8,7 @@ param appImage string
 var placeholder = appImage == 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 var authenticationPlugin = 'com.azure.identity.extensions.jdbc.postgresql.AzurePostgresqlAuthenticationPlugin'
 var tlsOptions = 'sslmode=verify-full&sslrootcert=/etc/ssl/certs/ca-certificates.crt'
-var identityOptions = 'authenticationPluginClassName=${authenticationPlugin}&azure.managedIdentityEnabled=true&azure.clientId=${identityClientId}'
+var identityOptions = 'authenticationPluginClassName=${authenticationPlugin}&azure.managedIdentityEnabled=true'
 var jdbcUrl = 'jdbc:postgresql://${databaseHost}:5432/petclinic?${tlsOptions}&${identityOptions}'
 
 resource app 'Microsoft.App/containerApps@2024-03-01' = {
@@ -18,8 +16,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
   location: location
   tags: { 'azd-service-name': serviceName }
   identity: {
-    type: 'UserAssigned'
-    userAssignedIdentities: { '${identityId}': {} }
+    type: 'SystemAssigned'
   }
   properties: {
     managedEnvironmentId: environmentId
@@ -34,7 +31,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             targetPort: 9966
             transport: 'http'
           }
-      registries: [{ server: registryEndpoint, identity: identityId }]
+      registries: [{ server: registryEndpoint, identity: 'system' }]
     }
     template: {
       containers: [
@@ -49,7 +46,6 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
               value: jdbcUrl
             }
             { name: 'SPRING_DATASOURCE_USERNAME', value: 'petclinic_app' }
-            { name: 'AZURE_CLIENT_ID', value: identityClientId }
           ]
           probes: placeholder
             ? []
@@ -74,6 +70,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
   }
 }
 
+output principalId string = app.identity.principalId
 output SERVICE_SPRING_PETCLINIC_REST_APP_ENDPOINT_URL string = placeholder
   ? ''
   : 'https://${app.properties.configuration.ingress.fqdn}/petclinic'

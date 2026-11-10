@@ -52,8 +52,8 @@ function Get-ResponseText {
 $root = Split-Path $PSScriptRoot -Parent
 $parameters = Get-Content -LiteralPath (Join-Path $root 'infra\application.parameters.json') -Raw |
     ConvertFrom-Json -AsHashtable
-if ($parameters.parameters['identityClientId']['value'] -cne '${APPLICATION_IDENTITY_CLIENT_ID}') {
-    throw 'The separate azd service deployment must receive the application identity client ID.'
+if ($parameters.parameters.ContainsKey('identityClientId') -or $parameters.parameters.ContainsKey('identityId')) {
+    throw 'The system-assigned service deployment must not receive a user-assigned identity selector.'
 }
 $definition = Get-Content -LiteralPath (Join-Path $root 'infra\application.bicep') -Raw
 if ($definition -match 'SPRING_APPLICATION_JSON|SPRING_SQL_INIT_MODE|SPRING_JPA_HIBERNATE_DDL_AUTO' -or
