@@ -15,6 +15,9 @@ database user, but can create and manage its own tables. Do not use sensitive da
 
 See the [editable diagram](docs/images/architecture.svg) and
 [gallery submission assets](docs/gallery.md).
+The app and temporary job have distinct system-assigned identities. The job's
+temporary PostgreSQL administrator registration refers to that same job
+principal, not a third identity or an Azure RBAC role assignment.
 
 ## Deploy
 
@@ -82,6 +85,11 @@ system-assigned identity, grants that principal `AcrPull` on the registry, and
 configures registry authentication as `system`. The service deployment keeps the
 same identity when switching to the private application image. Reprovisioning
 preserves the running image and identity.
+
+The recorded E2E used separate `azd provision` and
+`azd deploy spring-petclinic-rest-app` commands, with a registry-scoped `AcrPull`
+verification between them. This verification is an explicit test-harness step,
+not an additional template hook.
 
 After provisioning, the extension verifies the exact Container Apps outbound-IP
 firewall rules and maps the application identity to `petclinic_app`. SQL
@@ -185,3 +193,20 @@ to verify managed identity and extension-owned SQL bootstrap end-to-end.
 The template adds `application-azure-postgres.properties` for the passwordless
 Azure profile, and `pom.xml` adds `azure-identity-extensions` for passwordless JDBC authentication.
 See [UPSTREAM.md](UPSTREAM.md), [NOTICE](NOTICE), and [LICENSE.txt](LICENSE.txt).
+
+### Validated development lifecycle
+
+Application and infrastructure revision
+[`d0dd45c`](https://github.com/XiaofeiCao/petclinic-rest-azd/tree/d0dd45cd6aa16ed62ee7e4142ebb70935e183bcd)
+passed initial deployment, repeat deployment and revision restart, and
+reprovisioning with the same application principal and persistent non-seed
+record. Every stage passed REST create/read/update/delete checks, Entra-only
+authentication, verified TLS, exact egress firewall rules, and temporary
+job/administrator cleanup.
+
+This used a development extension build and a session-only bootstrap-runner
+accommodation, not an unmodified released extension or a released production
+runner. Azure accepted asynchronous deletion of the owned test environment;
+deletion completion was not polled or claimed. The diagram update changes
+documentation assets only; the validated application and infrastructure
+payload is unchanged.
