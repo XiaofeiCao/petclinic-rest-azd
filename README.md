@@ -93,6 +93,10 @@ Its temporary PostgreSQL Entra administrator registration authorizes that same
 job principal; it is not another identity or an Azure RBAC role assignment.
 No unrestricted PostgreSQL firewall rule is created.
 
+The infrastructure serializes PostgreSQL database creation, TLS configuration,
+exact-IP firewall rules and administrator registration. Flexible Server can reject
+overlapping child-resource writes with `ServerIsBusy`.
+
 Petclinic runs its original schema and seed SQL at startup. Restarting can restore
 deleted sample records. Azure activates the passwordless `azure-postgres` profile;
 the existing password-based `postgres` profile remains available for explicit local

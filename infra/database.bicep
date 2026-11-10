@@ -30,7 +30,7 @@ resource administrator 'Microsoft.DBforPostgreSQL/flexibleServers/administrators
   parent: server
   name: administratorObjectId
   // Entra administrator creation requires an accessible, configured server.
-  dependsOn: [database, requireTls]
+  dependsOn: [firewall]
   properties: {
     principalName: administratorName
     principalType: 'User'
@@ -47,13 +47,17 @@ resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-08-0
 resource requireTls 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
   parent: server
   name: 'require_secure_transport'
+  dependsOn: [database]
   properties: { value: 'on', source: 'user-override' }
 }
 
+// Flexible Server rejects overlapping child writes with ServerIsBusy.
+@batchSize(1)
 resource firewall 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-08-01' = [
   for ip in union(outboundIps, []): {
     parent: server
     name: 'aca-${replace(ip, '.', '-')}'
+    dependsOn: [requireTls]
     properties: { startIpAddress: ip, endIpAddress: ip }
   }
 ]

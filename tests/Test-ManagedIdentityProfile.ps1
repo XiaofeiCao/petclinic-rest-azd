@@ -86,6 +86,20 @@ if ($mainBicep.Contains('bootstrap-local-ip', [StringComparison]::OrdinalIgnoreC
     $databaseBicep.Contains('255.255.255.255', [StringComparison]::Ordinal)) {
     throw 'The template must not create unrestricted PostgreSQL bootstrap access.'
 }
+foreach ($order in @(
+    @{ resource = 'requireTls'; predecessor = 'database' },
+    @{ resource = 'firewall'; predecessor = 'requireTls' },
+    @{ resource = 'administrator'; predecessor = 'firewall' }
+)) {
+    $definition = [regex]::Match(
+        $databaseBicep, "(?ms)^resource $($order.resource)\b.*?(?=^(resource|output)\s|\z)").Value
+    if ($definition -notmatch "dependsOn:\s*\[$($order.predecessor)\]") {
+        throw "PostgreSQL $($order.resource) must wait for $($order.predecessor) to avoid overlapping server writes."
+    }
+}
+if ($databaseBicep -notmatch '@batchSize\(1\)\r?\nresource firewall\b') {
+    throw 'PostgreSQL firewall writes must be serialized with batch size one.'
+}
 if ($applicationBicep -notmatch
     "SPRING_PROFILES_ACTIVE'\s*,\s*value:\s*'azure-postgres,spring-data-jpa'") {
     throw 'Azure deployment must activate the dedicated managed-identity PostgreSQL profile.'
