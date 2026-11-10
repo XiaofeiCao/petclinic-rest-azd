@@ -46,6 +46,25 @@ Both are burstable demo configurations, not production tiers. Regional SKU
 availability and subscription quota apply. For automation, set `DATABASE_SIZE`
 with `azd env set` before provisioning; `--no-prompt` uses small unless saved.
 
+### Subscriptions requiring VNet integration
+
+The default deployment does not create a customer-managed VNet. If Azure Policy
+requires the Container Apps environment to use one, select a fresh environment
+and enable the published option **before the first provision**:
+
+```sh
+azd env set AZURE_USE_VNET true
+azd up
+```
+
+This template substitution selects the Bicep `useVirtualNetwork` parameter.
+It creates a dedicated VNet and `/23` infrastructure subnet; HTTPS ingress and
+the PostgreSQL endpoint remain public. It does not create private endpoints,
+a NAT gateway, or policy-exemption tags. The extension still reconciles only
+the Container Apps environment's exact outbound-IP database firewall rules.
+VNet integration is fixed when the environment is created; do not toggle this
+setting on an existing deployment. Use a fresh environment to change topology.
+
 Use a **fresh environment** when upgrading from a password-based or
 user-assigned-identity version.
 Reprovisioning does not migrate data or delete retired MySQL, Key Vault, jobs,
@@ -120,8 +139,10 @@ Open [Swagger UI](http://localhost:9966/petclinic/swagger-ui.html),
 - Firewall rules named `aca-<IPv4-address-with-hyphens>` are template-owned.
   Reprovisioning removes obsolete rules and preserves unrelated rules, which can
   grant additional access. Reprovision if app outbound IPs change.
-- No customer-managed VNet, private endpoints, or fixed-egress NAT gateway are configured. Shared egress
-  IPs are not workload isolation; database authentication remains required.
+- A customer-managed VNet is created only when `AZURE_USE_VNET=true` is selected
+  before provisioning. Neither topology creates private endpoints or a
+  fixed-egress NAT gateway. An IP firewall is not workload identity isolation;
+  database authentication remains required.
 - Do not commit `.azure/` or publish its contents.
 
 If identity bootstrap fails, check the signed-in tenant and the redacted Container

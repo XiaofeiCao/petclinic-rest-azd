@@ -8,6 +8,7 @@ $databaseBicep = Get-Content -LiteralPath (Join-Path $root 'infra\database.bicep
 $applicationBicep = Get-Content -LiteralPath (Join-Path $root 'infra\application.bicep') -Raw
 $bootstrapBicep = Get-Content -LiteralPath (Join-Path $root 'infra\bootstrap.bicep') -Raw
 $hostingBicep = Get-Content -LiteralPath (Join-Path $root 'infra\hosting.bicep') -Raw
+$mainParameters = Get-Content -LiteralPath (Join-Path $root 'infra\main.parameters.json') -Raw
 $registryAccess = Get-Content -LiteralPath (Join-Path $root 'infra\registry-access.bicep') -Raw
 $applicationParameters = Get-Content -LiteralPath (Join-Path $root 'infra\application.parameters.json') -Raw
 $azureProfile = Get-Content -LiteralPath (
@@ -68,8 +69,16 @@ foreach ($output in @(
         $applicationBicep -notmatch "identity:\s*'system'") {
         throw 'Create the placeholder SAI, grant registry-scoped AcrPull, then configure the private image with system identity.'
     }
-    if (($hostingBicep + $mainBicep) -match 'virtualNetworks|infrastructureSubnetId|privateEndpoints|natGateways') {
-        throw 'The published baseline must not introduce a customer-managed network overlay.'
+    if ($hostingBicep -notmatch 'param useVirtualNetwork bool = false' -or
+        $mainBicep -notmatch 'param useVirtualNetwork bool = false' -or
+        $mainBicep -notmatch 'useVirtualNetwork:\s*useVirtualNetwork' -or
+        $hostingBicep -notmatch "virtualNetworks@[^']+'\s*=\s*if \(useVirtualNetwork\)" -or
+        $hostingBicep -notmatch 'vnetConfiguration:\s*useVirtualNetwork \?' -or
+        $hostingBicep -notmatch "addressPrefix:\s*'10\.0\.0\.0/23'" -or
+        $hostingBicep -notmatch 'internal:\s*false' -or
+        -not $mainParameters.Contains('${AZURE_USE_VNET=false}', [StringComparison]::Ordinal) -or
+        ($hostingBicep + $mainBicep) -match 'privateEndpoints|natGateways') {
+        throw 'VNet integration must be explicit, default off, public-ingress compatible and free of private endpoints or NAT.'
     }
 }
 if ($mainBicep.Contains('bootstrap-local-ip', [StringComparison]::OrdinalIgnoreCase) -or
@@ -119,4 +128,4 @@ foreach ($obsoletePath in @(
     }
 }
 
-Write-Host 'System identity, staged registry access, no-network-overlay baseline, and separate local PostgreSQL profile passed.'
+Write-Host 'System identity, staged registry access, opt-in networking, and separate local PostgreSQL profile passed.'

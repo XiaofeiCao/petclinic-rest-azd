@@ -4,6 +4,8 @@ targetScope = 'subscription'
 @maxLength(64)
 param environmentName string
 param location string
+@description('Opt in before the first provision when subscription policy requires a VNet-integrated Container Apps environment.')
+param useVirtualNetwork bool = false
 
 @description('Database size: small = 1 vCore / 2 GiB; larger = 2 vCores / 4 GiB and higher cost. Both use 32 GiB storage.')
 @allowed(['small', 'larger'])
@@ -25,7 +27,10 @@ resource group 'Microsoft.Resources/resourceGroups@2024-03-01' = {
 module hosting 'hosting.bicep' = {
   name: 'hosting'
   scope: group
-  params: { location: location }
+  params: {
+    location: location
+    useVirtualNetwork: useVirtualNetwork
+  }
 }
 
 module bootstrap 'bootstrap.bicep' = {
@@ -76,6 +81,7 @@ module application 'application.bicep' = {
 output AZURE_RESOURCE_GROUP string = group.name
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = hosting.outputs.registryEndpoint
 output CONTAINER_APP_ENVIRONMENT_ID string = hosting.outputs.environmentId
+output AZURE_VIRTUAL_NETWORK_ID string = hosting.outputs.virtualNetworkId
 output APPLICATION_PRINCIPAL_ID string = application.outputs.principalId
 output DATABASE_HOST string = database.outputs.host
 output DATABASE_SERVER_ID string = database.outputs.serverId
