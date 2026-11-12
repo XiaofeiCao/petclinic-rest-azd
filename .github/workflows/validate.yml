@@ -23,9 +23,7 @@ jobs:
           java-version: '17'
           cache: maven
       - name: Build and test
-        run: |
-          chmod +x ./mvnw
-          ./mvnw --batch-mode --no-transfer-progress verify
+        run: ./mvnw --batch-mode --no-transfer-progress verify
       - name: Compile infrastructure
         run: |
           az bicep build --file infra/main.bicep --outfile /tmp/petclinic-main.json

@@ -168,7 +168,7 @@ curl "https://<app-host>/petclinic/api/vets"
 With JDK 17 installed, run from the project root:
 
 ```sh
-sh ./mvnw spring-boot:run
+./mvnw spring-boot:run
 ```
 
 On Windows PowerShell, use `.\mvnw.cmd spring-boot:run`.
@@ -200,6 +200,10 @@ If identity bootstrap fails, check the signed-in tenant and the redacted Contain
 Apps job diagnostic printed by the extension. Rerun `azd provision` after
 correcting the cause. Do not add an unrestricted PostgreSQL firewall rule.
 
+On macOS or Linux, `mvnw` must be executable. If an existing copy reports
+`permission denied` when azd invokes `mvnw`, run `chmod +x ./mvnw`, then retry
+`azd up`. Fresh copies from this branch include the executable permission.
+
 ## Clean up
 
 ```sh
@@ -215,8 +219,7 @@ With JDK 17, Azure CLI and PowerShell 7 installed for these local helper checks,
 plus the packaging prerequisites:
 
 ```sh
-chmod +x ./mvnw
-sh ./mvnw --batch-mode --no-transfer-progress verify
+./mvnw --batch-mode --no-transfer-progress verify
 az bicep build --file infra/main.bicep
 az bicep build --file infra/application.bicep
 pwsh -File tests/Test-ManagedIdentityProfile.ps1
