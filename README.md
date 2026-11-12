@@ -4,7 +4,10 @@ A standalone azd template for the Spring Petclinic REST API (no web UI) on
 Azure Container Apps with PostgreSQL 16. Managed identity authenticates to the
 database and Container Registry; no database password or Key Vault is needed.
 The `azure.springboot` extension required by `azure.yaml` packages the application,
-deploys the service module, and reconciles PostgreSQL access.
+deploys the service module, and reconciles PostgreSQL access. The `springbootapp`
+host builds with the Maven Wrapper and generates its own temporary runtime
+Dockerfile; the template does not need an authored Dockerfile or `docker:` block.
+Docker must still be installed and running for packaging.
 
 **Demo only:** the API is public and unauthenticated. The app is a non-admin
 database user, but can create and manage its own tables. Do not use sensitive data.
@@ -24,21 +27,46 @@ principal, not a third identity or an Azure RBAC role assignment.
 This branch requires a development build of the `azure.springboot` extension
 with extension-owned PostgreSQL job bootstrap support; installing azd alone
 does not provide that unreleased capability. See the
-[extension development instructions](https://github.com/Azure/azure-dev/tree/main/cli/azd/extensions/azure.springboot)
-and install the corresponding development build before deployment.
+[extension development instructions](https://github.com/XiaofeiCao/azure-dev/blob/xiaofeicao-spring-boot-template-roadmap/cli/azd/extensions/azure.springboot/README.md#local-development-installation)
+on the `xiaofeicao-spring-boot-template-roadmap` branch. Pull that branch and install
+its matching local bundle **before `azd init`**, not just before deployment.
+Building the extension from source requires Go 1.26.4 or newer. The bundle route
+does not require `azd x publish` or a local extension registry.
 The deployment also needs its release-configured bootstrap runner image.
 
-Install [azd](https://aka.ms/azd-install) 1.37.2 or newer, Azure CLI, Docker, and PowerShell 7.
-Start Docker and sign in to both CLIs with a user account in the target tenant:
+Install [azd](https://aka.ms/azd-install) 1.37.2 or newer, JDK 17+ and Docker.
+Start Docker for packaging and sign in to azd with a User account that can access
+the target subscription; a second Azure CLI login is not required for deployment:
 
 ```sh
-az login
 azd auth login
-azd init -t https://github.com/XiaofeiCao/petclinic-rest-azd/tree/postgres-job-bootstrap
+azd init -t https://github.com/XiaofeiCao/petclinic-rest-azd --branch postgres-job-bootstrap
 azd up
 ```
 
 Choose an environment, subscription, location, and database size.
+No manual subscription or administrator `azd env set` is needed for this
+interactive flow. The extension prompts for a missing administrator User object
+ID, with azd's current User in the selected subscription's resource tenant as
+the default, then asks for the selected User's missing principal name. Enter
+another User's object ID to select a different administrator. The extension
+does not decode tokens, query Microsoft Graph, or derive a name from an object ID.
+
+Valid configured `DATABASE_ADMIN_NAME` and `DATABASE_ADMIN_OBJECT_ID` values
+bypass their respective prompts for `azd up` and standalone `azd provision`.
+A name alone never selects another principal.
+The `SPRING_DATABASE_ADMINISTRATOR_NAME`/`SPRING_DATABASE_ADMINISTRATOR_OBJECT_ID`
+aliases must agree with these inputs. Saved administrator values are preserved
+when another User deploys the environment. Do not use a client/application ID
+instead of the User's object ID. Invalid interactive responses can be corrected;
+canceling saves no partial administrator selection. Prompt validation checks
+input format, not directory identity.
+
+For `--no-prompt`, supply the administrator name through the supported
+environment inputs before provisioning; an absent object ID uses the current
+User. Supply the object ID too to select another User. Missing names and
+conflicting inputs fail before identity preparation or extension writes.
+Native subscription/location inputs must also be available for automation.
 
 | Size | Compute | Storage |
 |---|---|---|
@@ -75,10 +103,21 @@ identities, secrets, or permissions.
 
 The deploying identity needs resource creation and role-assignment permissions,
 such as Contributor plus Role Based Access Control Administrator at subscription
-scope. Preflight hooks select the signed-in Azure CLI user as PostgreSQL Entra
-administrator before `azd up` resolves infrastructure parameters and before
-standalone `azd provision`. Service-principal-only provisioning is not supported.
-The lookup uses the existing ARM credential; no Microsoft Graph access is required.
+scope, plus permission to manage Container Apps Jobs and PostgreSQL Entra
+administrators. The extension's supported `preprovision` lifecycle event prepares
+the selected administrator for both `azd up` and standalone `azd provision`.
+There are no template preflight/preup preparation hooks. azd owns normal
+subscription/location selection; the extension uses host principal and
+`LookupTenant` APIs with the existing User login. The user-access tenant for
+credentials is distinct from the administrator's resource tenant.
+Service-principal-only provisioning is not supported.
+
+The required name/ID parameters keep their deferred bindings so initial Bicep
+provider setup can finish before the lifecycle event. The extension rejects
+invalid/conflicting configured inputs before identity preparation or state writes,
+then supplies real values for azd's parameter reload. Placeholders are never
+valid administrator inputs. The tested API rejects actual name omission; the
+template must still send `principalName`. Its resource architecture is unchanged.
 
 Provisioning first creates the Container App with a public placeholder and its
 system-assigned identity, grants that principal `AcrPull` on the registry, and
@@ -172,21 +211,45 @@ Database, container, registry, and logging usage incur Azure charges.
 
 ## Local checks and upstream source
 
-With JDK 17 and the deployment prerequisites installed:
+With JDK 17, Azure CLI and PowerShell 7 installed for these local helper checks,
+plus the packaging prerequisites:
 
 ```sh
+chmod +x ./mvnw
 sh ./mvnw --batch-mode --no-transfer-progress verify
 az bicep build --file infra/main.bicep
 az bicep build --file infra/application.bicep
 pwsh -File tests/Test-ManagedIdentityProfile.ps1
-docker build --tag petclinic-rest:test .
-pwsh -File tests/Test-ApplicationDatabase.ps1 -ApplicationImage petclinic-rest:test
 ```
 
-The database test checks non-admin application startup and restart with a local
-password fixture, not Azure authentication. The managed-identity profile test
+Initialize a local azd environment with `azd init -e local-check --no-prompt` if
+needed. Then package the application and run the database check in PowerShell 7.
+Use the image reference from that exact package result rather than selecting a
+previously cached Docker image:
+
+```powershell
+$packageJson = azd package --no-prompt --output json
+if ($LASTEXITCODE -ne 0) { throw 'Application packaging failed.' }
+$package = ($packageJson -join "`n") | ConvertFrom-Json
+$images = @($package.services.'spring-petclinic-rest-app'.artifacts |
+    Where-Object { $_.kind -eq 'container' -and $_.locationKind -eq 'local' })
+if ($images.Count -ne 1 -or [string]::IsNullOrWhiteSpace($images[0].location)) {
+    throw 'Expected exactly one packaged local application image.'
+}
+pwsh -File tests\Test-ApplicationDatabase.ps1 -ApplicationImage $images[0].location
+```
+
+The database test checks non-root OS execution and non-admin application startup
+and restart with a local password fixture, not Azure authentication. These
+packaging and database checks do not provision Azure resources.
+The managed-identity profile test
 checks template wiring and profile separation; a live Azure deployment is needed
 to verify managed identity and extension-owned SQL bootstrap end-to-end.
+
+CI builds the pinned public prototype revision in
+`.github/workflows/validate.yml` for packaging and local database checks only.
+That fixture is not a released extension and does not validate Azure deployment
+or PostgreSQL managed-identity bootstrap.
 
 `src/main/java/` is unchanged from upstream commit
 [`afc8fc1`](https://github.com/spring-petclinic/spring-petclinic-rest/tree/afc8fc1d3b8ec8de69414482b3bd70a1da78cb95).

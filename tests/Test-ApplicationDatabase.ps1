@@ -127,9 +127,9 @@ try {
     if ($response.StatusCode -ne 200 -or $health.status -ne 'UP') {
         throw 'The unmodified application health endpoint must report UP.'
     }
-    $user = Invoke-Docker @('inspect', '--format', '{{.Config.User}}', $application)
-    if ($user.Trim() -ne '10001:10001') {
-        throw 'The packaged application must run as the expected non-root OS user.'
+    $userId = ((Invoke-Docker @('exec', $application, 'id', '-u')) -join "`n").Trim()
+    if ($userId -notmatch '^[1-9][0-9]*$') {
+        throw 'The packaged application must run as a non-root OS user.'
     }
 
     Invoke-DatabaseQuery "UPDATE vets SET first_name = 'Preserved' WHERE id = 1; DELETE FROM vets WHERE id = 6" |

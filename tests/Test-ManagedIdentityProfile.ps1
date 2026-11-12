@@ -24,6 +24,12 @@ foreach ($required in @(
         throw "azure.yaml is missing the Spring Boot extension contract: $required."
     }
 }
+if (Test-Path -LiteralPath (Join-Path $root 'Dockerfile')) {
+    throw 'The template must use the extension-generated image, not a template-owned Dockerfile.'
+}
+if ($azureYaml -match '(?m)^\s*docker\s*:') {
+    throw 'The springbootapp host generates its runtime image; azure.yaml must not contain a docker block.'
+}
 foreach ($obsolete in @(
     'hooks:',
     'Configure-Database.ps1',
