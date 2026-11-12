@@ -18,21 +18,22 @@ database user, but can create and manage its own tables. Do not use sensitive da
 
 See the [editable diagram](docs/images/architecture.svg) and
 [gallery submission assets](docs/gallery.md).
-The app and temporary job have distinct system-assigned identities. The job's
-temporary PostgreSQL administrator registration refers to that same job
-principal, not a third identity or an Azure RBAC role assignment.
+The app's system-assigned identity pulls its image and authenticates to
+PostgreSQL. Provision-only SQL runs in the local extension with the signed-in
+User, not in a deployed bootstrap Job.
 
 ## Deploy
 
 This branch requires a development build of the `azure.springboot` extension
-with extension-owned PostgreSQL job bootstrap support; installing azd alone
+with extension-owned local PostgreSQL bootstrap support; installing azd alone
 does not provide that unreleased capability. See the
 [extension development instructions](https://github.com/XiaofeiCao/azure-dev/blob/xiaofeicao-spring-boot-template-roadmap/cli/azd/extensions/azure.springboot/README.md#local-development-installation)
 on the `xiaofeicao-spring-boot-template-roadmap` branch. Pull that branch and install
 its matching local bundle **before `azd init`**, not just before deployment.
 Building the extension from source requires Go 1.26.4 or newer. The bundle route
 does not require `azd x publish` or a local extension registry.
-The deployment also needs its release-configured bootstrap runner image.
+No bootstrap runner image, image publication, or release-only build setting is
+required.
 
 Install [azd](https://aka.ms/azd-install) 1.37.2 or newer, JDK 17+ and Docker.
 Start Docker for packaging and sign in to azd with a User account that can access
@@ -103,8 +104,9 @@ identities, secrets, or permissions.
 
 The deploying identity needs resource creation and role-assignment permissions,
 such as Contributor plus Role Based Access Control Administrator at subscription
-scope, plus permission to manage Container Apps Jobs and PostgreSQL Entra
-administrators. The extension's supported `preprovision` lifecycle event prepares
+scope, plus permission to manage PostgreSQL firewall rules and Entra
+administrators. Conservative recovery of older prototype Jobs also needs
+permission to read/delete those Jobs. The supported `preprovision` event prepares
 the selected administrator for both `azd up` and standalone `azd provision`.
 There are no template preflight/preup preparation hooks. azd owns normal
 subscription/location selection; the extension uses host principal and
@@ -125,20 +127,31 @@ configures registry authentication as `system`. The service deployment keeps the
 same identity when switching to the private application image. Reprovisioning
 preserves the running image and identity.
 
-The recorded E2E used separate `azd provision` and
-`azd deploy spring-petclinic-rest-app` commands, with a registry-scoped `AcrPull`
-verification between them. This verification is an explicit test-harness step,
-not an additional template hook.
-
 After provisioning, the extension verifies the exact Container Apps outbound-IP
-firewall rules and maps the application identity to `petclinic_app`. SQL
-reconciliation runs from a short-lived Container Apps job in the deployed
-environment. The job receives temporary administrator access only for the bounded
-execution window, then the extension removes that access before deleting the job.
-The job has its own system-assigned identity, distinct from the application's.
-Its temporary PostgreSQL Entra administrator registration authorizes that same
-job principal; it is not another identity or an Azure RBAC role assignment.
-No unrestricted PostgreSQL firewall rule is created.
+firewall rules and maps the application identity to `petclinic_app`.
+Only `postprovision` reconciles administrator SQL. It temporarily creates an
+owned all-IPv4 rule (`0.0.0.0` through `255.255.255.255`) and connects locally
+with hostname-verified TLS. The local network must allow outbound TCP 5432;
+the rule does not override network restrictions or Azure Policy.
+
+The selected User remains the persistent administrator. A verified existing
+caller administrator is used without changing its login or deleting it.
+Otherwise, the extension temporarily registers the signed-in caller with a
+separate session login and removes only that registration afterward.
+SQL sessions close before cleanup, and absence of both temporary resources is
+checked before provisioning becomes ready.
+
+Cleanup failure fails the command and retains ownership state under
+`.azure/spring-postgres-bootstrap/` for a later `azd provision` from the same
+project. Do not remove pending recovery state. A killed process can leave
+access open; there is no automatic expiration, and firewall enforcement can
+lag resource deletion. Do not run overlapping provisioning from separate
+copies of the same environment.
+
+`azd deploy` checks current provisioning, datasource and runtime firewall
+bindings without administrator SQL. There is no postdeploy SQL ownership audit;
+rerun `azd provision` to reconcile database access. The exact runtime IP rules
+remain in infrastructure; no broad bootstrap rule is authored in Bicep.
 
 The infrastructure serializes PostgreSQL database creation, TLS configuration,
 exact-IP firewall rules and administrator registration. Flexible Server can reject
@@ -180,7 +193,7 @@ Open [Swagger UI](http://localhost:9966/petclinic/swagger-ui.html),
 
 ## Security and troubleshooting
 
-- Ingress is HTTPS-only; the bootstrap image has no public ingress.
+- Application ingress is HTTPS-only. There is no bootstrap Job or runner image.
 - PostgreSQL password authentication is disabled. The JDBC authentication plugin
   obtains tokens using the app's system-assigned managed identity, without an
   `azure.clientId` or `AZURE_CLIENT_ID` selector.
@@ -196,9 +209,10 @@ Open [Swagger UI](http://localhost:9966/petclinic/swagger-ui.html),
   database authentication remains required.
 - Do not commit `.azure/` or publish its contents.
 
-If identity bootstrap fails, check the signed-in tenant and the redacted Container
-Apps job diagnostic printed by the extension. Rerun `azd provision` after
-correcting the cause. Do not add an unrestricted PostgreSQL firewall rule.
+If bootstrap fails, check the signed-in User/tenant, local TCP 5432 connectivity,
+and the extension's cleanup diagnostic. Rerun `azd provision` after correcting
+the cause; retain its recovery state. Do not manually add a persistent
+unrestricted PostgreSQL firewall rule.
 
 On macOS or Linux, `mvnw` must be executable. If an existing copy reports
 `permission denied` when azd invokes `mvnw`, run `chmod +x ./mvnw`, then retry

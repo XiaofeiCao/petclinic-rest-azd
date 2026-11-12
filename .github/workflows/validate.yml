@@ -35,7 +35,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: XiaofeiCao/azure-dev
-          ref: 6acee73a75cca98c3fddaca49445f4dad71298c5
+          ref: 0eaf15db05cf970777d1be5c5ef6cfd4573a505f
           path: .extension-src
           persist-credentials: false
       - name: Set up Go
